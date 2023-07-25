@@ -12,15 +12,18 @@ import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.SessionAttributes;
 import org.springframework.web.bind.support.SessionStatus;
 import org.thymeleaf.spring6.context.webflux.ReactiveDataDriverContextVariable;
 
 import com.udemy.springboot.webflux.app.models.documents.Producto;
 import com.udemy.springboot.webflux.app.models.services.ProductoService;
 
+import jakarta.validation.Valid;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+@SessionAttributes("producto")
 @Controller
 public class ProductoController {
 
@@ -59,7 +62,7 @@ public class ProductoController {
 			model.addAttribute("producto", p);
 		}).defaultIfEmpty(new Producto()).flatMap(p -> {
 			if (p.getId() == null) {
-				return Mono.error(new InterruptedException("No extiste el producto"));
+				return Mono.error(new InterruptedException("No existe el producto"));
 			}
 			return Mono.just(p);
 		}).then(Mono.just("form")).onErrorResume(ex -> Mono.just("redirect:/listar?error=no+existe+el+producto"));
@@ -99,7 +102,7 @@ public class ProductoController {
 		}
 	}
 
-	@GetMapping("/eliminar/{id}")
+	/*@GetMapping("/eliminar/{id}")
 	public Mono<String> eliminar(@PathVariable String id) {
 		return productoService.findById(id).defaultIfEmpty(new Producto()).flatMap(p -> {
 			if (p.getId() == null) {
@@ -112,7 +115,7 @@ public class ProductoController {
 			return service.delete(p);
 		}).then(Mono.just("redirect:/listar?success=producto+eliminado+con+exito"))
 				.onErrorResume(ex -> Mono.just("redirect:/listar?error=no+existe+el+producto+a+eliminar"));
-	}
+	}*/
 
 	@GetMapping("/listar-datadriver")
 	public String listarDataDriver(Model model) {
