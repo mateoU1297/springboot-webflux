@@ -7,15 +7,23 @@ import org.springframework.data.mongodb.core.mapping.Document;
 
 @Document(collection = "productos")
 public class Producto {
-	
+
 	@Id
 	private String id;
-	
+
 	private String nombre;
-	
+
 	private Double precio;
-	
+
 	private Date createAt;
+
+	public Producto() {
+	}
+
+	public Producto(String nombre, Double precio) {
+		this.nombre = nombre;
+		this.precio = precio;
+	}
 
 	public String getId() {
 		return id;
@@ -48,7 +56,5 @@ public class Producto {
 	public void setCreateAt(Date createAt) {
 		this.createAt = createAt;
 	}
-	
-	
 
 }
