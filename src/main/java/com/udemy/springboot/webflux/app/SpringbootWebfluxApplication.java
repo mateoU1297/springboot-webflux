@@ -63,7 +63,6 @@ public class SpringbootWebfluxApplication implements CommandLineRunner {
 					})
 		)
 		.subscribe(producto -> log.info("Insert: " + producto.getId() + " " + producto.getNombre()));
-		
 	}
 
 }

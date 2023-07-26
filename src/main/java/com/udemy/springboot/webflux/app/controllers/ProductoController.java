@@ -1,11 +1,21 @@
 package com.udemy.springboot.webflux.app.controllers;
 
+import java.io.File;
+import java.net.MalformedURLException;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.Duration;
 import java.util.Date;
+import java.util.UUID;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.validation.BindingResult;
@@ -13,6 +23,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.SessionAttributes;
 import org.springframework.web.bind.support.SessionStatus;
 import org.thymeleaf.spring6.context.webflux.ReactiveDataDriverContextVariable;
@@ -32,11 +43,39 @@ public class ProductoController {
 	@Autowired
 	private ProductoService productoService;
 
+	private String path = "C://Users//DELL//Documents//Proyectos//Udemy//Programación Reactiva con Spring Boot y Spring WebFlux//uploads//";
+
 	private static final Logger log = LoggerFactory.getLogger(ProductoController.class);
 
 	@ModelAttribute("categorias")
 	public Flux<Categoria> categorias() {
 		return productoService.findAllCategoria();
+	}
+
+	@GetMapping("/uploads/img/{nombreFoto:.+}")
+	public Mono<ResponseEntity<Resource>> verFoto(@PathVariable String nombreFoto) throws MalformedURLException {
+		Path ruta = Paths.get(path).resolve(nombreFoto).toAbsolutePath();
+
+		Resource imagen = new UrlResource(ruta.toUri());
+
+		return Mono.just(ResponseEntity.ok()
+				.header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + imagen.getFilename() + "\"")
+				.body(imagen));
+
+	}
+
+	@GetMapping("/ver/{id}")
+	public Mono<String> ver(Model model, @PathVariable String id) {
+
+		return productoService.findById(id).doOnNext(p -> {
+			model.addAttribute("producto", p);
+			model.addAttribute("titulo", "Detalle Producto");
+		}).switchIfEmpty(Mono.just(new Producto())).flatMap(p -> {
+			if (p.getId() == null) {
+				return Mono.error(new InterruptedException("No extiste el producto"));
+			}
+			return Mono.just(p);
+		}).then(Mono.just("ver")).onErrorResume(ex -> Mono.just("redirect:/listar?error=no+existe+el+producto"));
 	}
 
 	@GetMapping({ "/listar", "/" })
@@ -90,7 +129,8 @@ public class ProductoController {
 	}
 
 	@PostMapping("/form")
-	public Mono<String> guardar(@Valid Producto producto, BindingResult result, Model model, SessionStatus status) {
+	public Mono<String> guardar(@Valid Producto producto, BindingResult result, Model model, @RequestPart FilePart file,
+			SessionStatus status) {
 
 		if (result.hasErrors()) {
 			model.addAttribute("titulo", "Errores en formulario producto");
@@ -99,12 +139,28 @@ public class ProductoController {
 		} else {
 			status.setComplete();
 
-			if (producto.getCreateAt() == null) {
-				producto.setCreateAt(new Date());
-			}
+			Mono<Categoria> categoria = productoService.findCategoriaById(producto.getCategoria().getId());
 
-			return productoService.save(producto).doOnNext(p -> {
+			return categoria.flatMap(c -> {
+				if (producto.getCreateAt() == null) {
+					producto.setCreateAt(new Date());
+				}
+
+				if (!file.filename().isEmpty()) {
+					producto.setFoto(UUID.randomUUID().toString() + "-"
+							+ file.filename().replace(" ", "").replace(":", "").replace("\\", ""));
+				}
+				producto.setCategoria(c);
+				return productoService.save(producto);
+			}).doOnNext(p -> {
+				log.info(
+						"Categoria asignada: " + p.getCategoria().getNombre() + " Id Cat: " + p.getCategoria().getId());
 				log.info("Producto guardado: " + p.getNombre() + " Id: " + p.getId());
+			}).flatMap(p -> {
+				if (!file.filename().isEmpty()) {
+					return file.transferTo(new File(path + p.getFoto()));
+				}
+				return Mono.empty();
 			}).thenReturn("redirect:/listar?success=producto+guardado+con+exito");
 		}
 	}
